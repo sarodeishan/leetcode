@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenant Quota Form</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        div {
+            text-align: center;
+            padding: 10px;
+            border: 1px solid;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body style="text-align: center; border: 1px solid">
+
+<h2>Tenant Quota Form</h2>
+
+<div id="AuthorizationSection">
+    <label for="apiKey">Bearer Token:</label>
+    <input type="text" id="apiKey" name="apiKey" required>
+    <button type="button" id="apiLogin" name="apiLogin" onclick="toggleAuthorization()">Authorize</button>
+</div>
+
+<div id="ErrorMessage">
+    <h3 style="color:red" id="errors"></h3>
+</div>
+
+<div id="SuccessMessage">
+    <h3 style="color:green" id="success"></h3>
+</div>
+
+<div id="MainSection">
+
+    <div id="operation">
+        Operations:<br>
+        <input type="radio" id="CreateTenant" name="tenantAction" value="CreateTenant">
+        <label for="CreateTenant">CreateTenant</label>
+        <input type="radio" id="GetTenant" name="tenantAction" value="GetTenant">
+        <label for="GetTenant">GetTenant</label>
+        <input type="radio" id="UpdateTenant" name="tenantAction" value="UpdateTenant">
+        <label for="UpdateTenant">UpdateTenant</label>
+        <input type="radio" id="DeleteTenant" name="tenantAction" value="DeleteTenant">
+        <label for="DeleteTenant">DeleteTenant</label>
+        <input type="radio" id="GetTenantAudit" name="tenantAction" value="GetTenantAudit">
+        <label for="GetTenantAudit">GetTenantAudit</label><br>
+
+        <label for="inputTenantId">TenantId:</label>
+        <input type="text" id="inputTenantId" name="inputTenantId" required>
+        <button type="button" id="getTenantDetails" name="getTenantDetails" onclick="showOperation()">Submit</button>
+
+    </div>
+
+    <div id="TenantForm" hidden>
+        <form id="tenantQuotaForm">
+
+            <table id="tenantDetailTable">
+                <tr id="UpdateOptions" hidden>
+                    <td>
+                    <td>
+                        <input type="radio" id="changeQuota" name="UpdateAction" value="changeQuota" onchange="showEditableValues(this.value)">
+                        <label for="changeQuota">Change Quota</label>
+                        <input type="radio" id="Renew" name="UpdateAction" value="Renew" onchange="showEditableValues(this.value)">
+                        <label for="Renew">Renew Subscription</label>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>
+                        <label for="tenantId">Tenant ID:</label>
+                    <td>
+                        <input type="text" id="tenantId" name="tenantId" placeholder="Insert Tenant Id"
+                               required><br>
+                </tr>
+
+                <tr>
+                    <td>
+                        <label for="totalQuota">Total Quota:</label>
+                    <td>
+                        <input type="number" id="totalQuota" name="totalQuota"
+                               placeholder="Current Total quota"
+                               required><br>
+                    <td id="changeQuotaCell" hidden>
+                        <label for="changeQuotaInput">Add change by:</label>
+                        <input type="number" id="changeQuotaInput" name="changeQuotaInput"
+                               placeholder="Change Quota Value(+/-)" oninput="updateNewQuota(this.value)"
+                               required><br>
+                    <td id="NewQuotaCell" hidden>=
+                    <label for="newQuota">New Total Quota:</label>
+                    <input type="number" id="newQuota" name="newQuota"
+                               placeholder="New Quota" readonly
+                               required><br>
+                </tr>
+
+                <tr id="availableQuotaRow" hidden>
+                    <td>
+                        <label for="availableQuota">Available Quota:</label>
+                    <td>
+                        <input type="number" id="availableQuota" name="availableQuota" placeholder="Remaining Quota"
+                               disabled
+                               required><br>
+                </tr>
+
+                <tr>
+                    <td><label for="subscriptionEndDate">Subscription End Date:</label>
+                    <td><input type="date" id="subscriptionEndDate" name="subscriptionEndDate" required><br>
+                    <td id="newSubscriptionEndDateCell" hidden>
+                        <label for="newSubscriptionEndDate">New Subscription End Date:</label>
+                        <input type="date" id="newSubscriptionEndDate" name="newSubscriptionEndDate" required><br>
+                </tr>
+
+                <tr>
+                    <td><label for="message">Message:</label>
+                    <td><textarea id="message" name="message" placeholder="Additional notes on change"
+                                  rows="4"></textarea><br>
+                </tr>
+
+            </table>
+            <button type="button" id="formSubmitButton" style="text-align:center" onclick="submitForm()">Submit</button>
+            <button type="button" id="deleteTenantButton" style="text-align:center" onclick="deleteTenant()" hidden>Delete</button>
+            <button type="button" id="updateTenantButton" style="text-align:center" onclick="updateTenant()" hidden>Update</button>
+        </form>
+    </div>
+</div>
+
+<div id="TenantAuditSection">
+    <h2>Tenant Audit</h2>
+    <table id="auditDataTable">
+        <tr>
+            <th>Tenant ID</th>
+            <th>Total Quota</th>
+            <th>Available Quota</th>
+            <th>Subscription End Date</th>
+            <th>Action</th>
+            <th>Modified At</th>
+            <th>Username</th>
+            <th>Message</th>
+        </tr>
+    </table>
+</div>
+
+<script>
+
+    function showOperation(){
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        const apiKeyInput = document.getElementById('apiKey').value;
+        const inputTenantId = document.getElementById('inputTenantId').value;
+        if (apiKeyInput.trim() == '' || inputTenantId.trim() == '') {
+            errors.innerText = "Token, operation and tenantId are required";
+            return;
+        }
+        document.getElementById("TenantForm").hidden = false;
+        var selectedOperationValue = getSelectedOperationValue();
+        switch (selectedOperationValue) {
+            case 'CreateTenant':
+                document.getElementById('tenantQuotaForm').reset();
+                document.getElementById('UpdateOptions').hidden = true;
+                document.getElementById('formSubmitButton').hidden = false;
+                document.getElementById('deleteTenantButton').hidden = true;
+                document.getElementById('updateTenantButton').hidden = true;
+                document.getElementById("tenantId").value = document.getElementById("inputTenantId").value;
+                document.getElementById("tenantId").disabled = true;
+                break;
+            case 'GetTenant':
+                document.getElementById('tenantQuotaForm').reset();
+                // Implement read operation
+                document.getElementById('UpdateOptions').hidden = true;
+                document.getElementById('formSubmitButton').hidden = false;
+                document.getElementById('deleteTenantButton').hidden = true;
+                document.getElementById('updateTenantButton').hidden = true;
+                document.getElementById("tenantId").value = document.getElementById("inputTenantId").value;
+                getTenant();
+                break;
+            case 'UpdateTenant':
+                document.getElementById('tenantQuotaForm').reset();
+                document.getElementById("tenantId").value = document.getElementById("inputTenantId").value;
+                document.getElementById('formSubmitButton').hidden = true;
+                document.getElementById('deleteTenantButton').hidden = true;
+                document.getElementById('updateTenantButton').hidden = false;
+                getTenant();
+                document.getElementById('updateTenantButton').hidden = false;
+                document.getElementById('message').hidden = false;
+                document.getElementById('UpdateOptions').hidden = false;
+                break;
+            case 'DeleteTenant':
+                document.getElementById('tenantQuotaForm').reset();
+                document.getElementById('UpdateOptions').hidden = true;
+                document.getElementById('formSubmitButton').hidden = true;
+                document.getElementById('deleteTenantButton').hidden = false;
+                document.getElementById('updateTenantButton').hidden = true;
+                document.getElementById("tenantId").value = document.getElementById("inputTenantId").value;
+                // Implement delete operation
+                getTenant();
+                document.getElementById('deleteTenantButton').hidden = false;
+                break;
+            case 'GetTenantAudit':
+                document.getElementById('tenantQuotaForm').reset();
+                document.getElementById('UpdateOptions').hidden = true;
+                // Implement get audit operation
+                getTenantAudit();
+                break;
+            default:
+                console.error('Invalid operation');
+        }
+    }
+
+    function showEditableValues(value){
+        if (value=='changeQuota') {
+            document.getElementById('changeQuotaCell').hidden = false;
+            document.getElementById('NewQuotaCell').hidden = false;
+            //clear other value
+            document.getElementById('newSubscriptionEndDate').value = null;
+            //hide other
+            document.getElementById('newSubscriptionEndDateCell').hidden = true;
+        } else if (value=='Renew'){
+            document.getElementById('newSubscriptionEndDateCell').hidden = false;
+        } else {
+            console.log("wrong update option");
+        }
+    }
+
+    function updateNewQuota(value) {
+        const newQuota = document.getElementById('newQuota');
+        const totalQuota = document.getElementById('totalQuota');
+        newQuota.value = parseInt(totalQuota.value) + parseInt(value);
+    }
+
+    function getSelectedOperationValue() {
+        const selectedOperation = document.querySelector('input[name="tenantAction"]:checked');
+        console.log("Selected operation: " + selectedOperation)
+        if (selectedOperation == null || selectedOperation.value.trim() == '') {
+            document.getElementById('errors').innerText = "Select 1 operation";
+            return;
+        }
+        var selectedOperationValue = selectedOperation.value;
+        console.log("Selected operation: " + selectedOperationValue)
+        return selectedOperationValue;
+    }
+
+    function getUpdateActionValue() {
+        const selectedOperation = document.querySelector('input[name="UpdateOptions"]:checked');
+        console.log("Update options selected: " + selectedOperation)
+        if (selectedOperation == null || selectedOperation.value.trim() == '') {
+            document.getElementById('errors').innerText = "Select 1 update action change/renew";
+            return;
+        }
+        var selectedOperationValue = selectedOperation.value;
+        console.log("Selected operation: " + selectedOperationValue)
+        return selectedOperationValue;
+    }
+
+    function submitForm() {
+        var selectedOperationValue = getSelectedOperationValue();
+        switch (selectedOperationValue) {
+            case 'CreateTenant':
+                createTenant();
+                document.getElementById('tenantQuotaForm').reset();
+                break;
+            case 'GetTenant':
+                // Implement read operation
+                getTenant();
+                break;
+            case 'UpdateTenant':
+                getTenant();
+                document.getElementById('updateTenantButton').hidden = false;
+                document.getElementById('message').hidden = false;
+                document.getElementById('UpdateOptions').hidden = false;
+                break;
+            case 'DeleteTenant':
+                // Implement delete operation
+                getTenant();
+                document.getElementById('deleteTenantButton').hidden = false;
+                break;
+            case 'GetTenantAudit':
+                // Implement get audit operation
+                getTenantAudit();
+                break;
+
+            default:
+                console.error('Invalid operation');
+        }
+    }
+
+    let authorized = false;
+
+    function toggleAuthorization() {
+        const apiKeyInput = document.getElementById('apiKey');
+        const apiKey = apiKeyInput.value;
+
+        if (authorized) {
+            // If authorized, reset to initial state
+            apiKeyInput.disabled = false;
+            apiKeyInput.value = null;
+            document.querySelector('button').innerText = 'Authorize';
+        } else {
+            // If not authorized, perform authorization logic
+            if (apiKey.trim() !== '') {
+                apiKeyInput.disabled = true;
+                document.querySelector('button').innerText = 'Logout';
+            }
+        }
+
+        // Toggle the authorized state
+        authorized = !authorized;
+    }
+
+    function createTenant() {
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        // Get form data
+        const apiKeyInput = document.getElementById('apiKey').value;
+        const tenantId = document.getElementById('tenantId').value;
+        const quota = document.getElementById('totalQuota').value;
+        const subscriptionEndDate = document.getElementById('subscriptionEndDate').value;
+        const message = document.getElementById('message').value;
+        if (apiKeyInput.trim() == '' || tenantId.trim() == '' || quota.trim() == '' || subscriptionEndDate.trim() == '' || message.trim() == '') {
+            document.getElementById('errors').innerText = "All fields are required";
+            return;
+        }
+        let body = {tenantId: tenantId, quota: quota, subscriptionEndDate: subscriptionEndDate, message: message};
+
+        fetch("/quota/tenant", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKeyInput
+            },
+            body: JSON.stringify(body)
+        }).then(res => {
+            console.log("Request complete! raw response:", res);
+            console.log("Request complete! response:", JSON.stringify(res.body));
+
+            const status = res.status;
+            const response = res.json();
+            if (status > 199 && status < 300) {
+                success.innerText = 'Tenant Created successfully tenantId:' + tenantId + '\n' + status + ' ' + response.messages;
+            } else {
+                errors.innerText = status + ' ' + response.messages;
+            }
+        })
+    }
+
+    function getTenant() {
+        // Get form data
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        const apiKeyInput = document.getElementById('apiKey').value;
+
+        const tenantId = document.getElementById('inputTenantId').value;
+        if (apiKeyInput.trim() == '' || tenantId.trim() == '') {
+            document.getElementById('errors').innerText = "TenantId is required";
+            return;
+        }
+
+        fetch("/quota/tenant/" + tenantId, {
+            method: "GET",
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKeyInput
+            }
+        }).then(res => {
+            console.log("Request complete! raw response:", res);
+            console.log("Request complete! response:", JSON.stringify(res));
+
+            const status = res.status;
+            const body = res.json();
+            if (status > 199 && status < 300) {
+                success.innerText = status + ' ' + body.messages;
+                // hide submit button
+                document.getElementById('formSubmitButton').hidden = true;
+                document.getElementById('message').value = null;
+                document.getElementById('message').hidden = true;
+                //populate data
+                document.getElementById('tenantId').value = body.tenantId;
+                document.getElementById('tenantId').disabled = true;
+                document.getElementById('totalQuota').value = body.totalQuota;
+                document.getElementById('totalQuota').disabled = true;
+                document.getElementById('availableQuotaRow').hidden = false;
+                document.getElementById('availableQuota').value = body.availableQuota;
+                document.getElementById('availableQuota').disabled = true;
+                document.getElementById('subscriptionEndDate').value = body.subscriptionEndDate;
+                document.getElementById('subscriptionEndDate').disabled = true;
+            } else {
+                errors.innerText = status + ' ' + body.messages;
+            }
+        })
+    }
+
+    function deleteTenant() {
+        // Get form data
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        const apiKeyInput = document.getElementById('apiKey').value;
+        getSelectedOperationValue();
+        const tenantId = document.getElementById('tenantId').value;
+        if (apiKeyInput.trim() == '' || tenantId.trim() == '') {
+            document.getElementById('errors').innerText = "TenantId is required";
+            return;
+        }
+        // confirm with popup
+        if (confirm('Do you want to DELETE tenant with ID:' + tenantId)) {
+            console.log("Start Delete tenant Id:"+tenantId);
+            fetch("/quota/tenant/" + tenantId, {
+                method: "DELETE",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + apiKeyInput
+                }
+            }).then(res => {
+                console.log("Request complete! raw response:", res);
+                console.log("Request complete! response:", JSON.stringify(res));
+
+                const status = res.status;
+                const body = res.json();
+                if (status > 199 && status < 300) {
+                    success.innerText = status + ' ' + body.messages;
+
+                    // hide delete button
+                    document.getElementById('deleteTenantButton').hidden = true;
+                    document.getElementById('formSubmitButton').hidden = false;
+
+                    //reset form
+                    document.getElementById('tenantQuotaForm').reset();
+                    document.getElementById('message').hidden = false;
+                    document.getElementById('tenantId').value = null;
+                    document.getElementById('tenantId').disabled = false;
+                    document.getElementById('totalQuota').value = null;
+                    document.getElementById('totalQuota').disabled = false;
+                    document.getElementById('availableQuota').value = null;
+                    document.getElementById('subscriptionEndDate').value = null;
+                    document.getElementById('subscriptionEndDate').disabled = false;
+                    console.log("Form cleared after delete.");
+                } else {
+                    errors.innerText = status + ' ' + body.messages;
+                }
+            })
+        } else {
+            console.log("Delete operation cancelled for tenantId:"+tenantId);
+            return;
+        }
+        console.log("End Delete tenant Id:"+tenantId);
+    }
+
+    function getTenantAudit() {
+        // Get form data
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        const apiKeyInput = document.getElementById('apiKey').value;
+
+        const tenantId = document.getElementById('inputTenantId').value;
+        if (apiKeyInput.trim() == '' || tenantId.trim() == '') {
+            document.getElementById('errors').innerText = "TenantId is required";
+            return;
+        }
+
+        fetch("/quota/tenant/" + tenantId + "/audit", {
+            method: "GET",
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKeyInput
+            }
+        }).then(res => {
+            console.log("Request complete! raw response:", res);
+            console.log("Request complete! response:", JSON.stringify(res));
+
+            const status = res.status;
+            const body = res.json();
+            if (status > 199 && status < 300) {
+                success.innerText = status + ' ' + body.messages;
+
+                const table = document.getElementById('auditDataTable');
+                table.innerHTML = "";
+                // Populate Data
+                body.result.forEach(audit => {
+                    // Create a new table row
+                    const row = table.insertRow();
+                    // Insert data into the table cells
+                    const cell1 = row.insertCell(0);
+                    cell1.innerHTML = audit.tenantId;
+                    const cell2 = row.insertCell(1);
+                    cell2.innerHTML = audit.totalQuota;
+                    const cell3 = row.insertCell(2);
+                    cell3.innerHTML = audit.availableQuota;
+                    const cell4 = row.insertCell(3);
+                    cell4.innerHTML = audit.subscriptionEndDate;
+                    const cell5 = row.insertCell(4);
+                    cell5.innerHTML = audit.revisionType;
+                    const cell6 = row.insertCell(5);
+                    cell6.innerHTML = audit.revisionTimestamp;
+                    const cell7 = row.insertCell(6);
+                    cell7.innerHTML = audit.modifiedBy;
+                    const cell8 = row.insertCell(7);
+                    cell8.innerHTML = audit.message;
+                });
+            } else {
+                errors.innerText = status + ' ' + body.messages;
+            }
+        });
+
+    }
+
+    function updateTenant() {
+        // Get form data
+        const errors = document.getElementById('errors');
+        const success = document.getElementById('success');
+        const apiKeyInput = document.getElementById('apiKey').value;
+        getSelectedOperationValue();
+        const updateAction = getUpdateActionValue();
+        const tenantId = document.getElementById('tenantId').value;
+        const message = document.getElementById('message').value;
+        const quota = document.getElementById('totalQuota').value;
+        const subscriptionEndDate = document.getElementById('subscriptionEndDate').value;
+        if (apiKeyInput.trim() == '' || tenantId.trim() == '' || quota.trim() == '' || subscriptionEndDate.trim() == '' || message.trim() == '') {
+            document.getElementById('errors').innerText = "All fields are required";
+            return;
+        }
+
+        const newSubscriptionEndDate = document.getElementById('newSubscriptionEndDate').value;
+        const newTotalQuota = document.getElementById('newQuota').value;
+        if (newTotalQuota.trim() == '' || newTotalQuota < 0) {
+            document.getElementById('errors').innerText = "New Total Quota isn't valid. Please change to positive quota";
+            return;
+        }
+        let body;
+        if (updateAction=='changeQuota'){
+            if (newTotalQuota.trim() == '' || newTotalQuota == quota) {
+                document.getElementById('errors').innerText = "Quota isn't changed for the option";
+                return;
+            }
+            body = {tenantId: tenantId, quota: newTotalQuota, subscriptionEndDate: subscriptionEndDate, message: message};
+        } else if (updateAction=='Renew'){
+            if (newSubscriptionEndDate.trim() != '' && newSubscriptionEndDate.getTime() > new Date().getTime()) {
+                document.getElementById('errors').innerText = "New Subscription end date isn't valid. Please change to future date";
+                return;
+            }
+            if (subscriptionEndDate.trim() == '' || newSubscriptionEndDate.trim() == '' || subscriptionEndDate == newSubscriptionEndDate) {
+                document.getElementById('errors').innerText = "Subscription Date is not changed";
+                return;
+            }
+            body = {tenantId: tenantId, quota: newQuota, subscriptionEndDate: newSubscriptionEndDate, message: message};
+        } else {
+            document.getElementById('errors').innerText = "Select Update Action";
+            return;
+        }
+
+
+        // confirm with popup
+        if (confirm('Do you want to UPDATE tenant with ID:' + tenantId)) {
+            console.log("Start Update tenant Id:"+tenantId);
+            fetch("/quota/tenant/" + tenantId, {
+                method: "PUT",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + apiKeyInput
+                },
+                body: JSON.stringify(body)
+            }).then(res => {
+                console.log("Request complete! raw response:", res);
+                console.log("Request complete! response:", JSON.stringify(res));
+
+                const status = res.status;
+                const body = res.json();
+                if (status > 199 && status < 300) {
+                    success.innerText = status + ' ' + body.messages;
+
+                    document.getElementById('tenantQuotaForm').reset();
+                    // hide delete button
+                    document.getElementById('formSubmitButton').hidden = false;
+                    document.getElementById('updateTenantButton').hidden = true;
+                    document.getElementById('UpdateOptions').hidden = true;
+                    document.getElementById('changeQuotaCell').hidden = true;
+                    document.getElementById('changeQuotaCell').value = null;
+                    document.getElementById('NewQuotaCell').hidden = true;
+                    document.getElementById('NewQuotaCell').value = null;
+                    document.getElementById('newSubscriptionEndDate').value = null;
+                    document.getElementById('newSubscriptionEndDateCell').hidden = true;
+                    //reset form
+                    document.getElementById('message').value = null;
+                    document.getElementById('message').hidden = false;
+                    document.getElementById('tenantId').value = null;
+                    document.getElementById('tenantId').disabled = false;
+                    document.getElementById('totalQuota').value = null;
+                    document.getElementById('totalQuota').disabled = false;
+                    document.getElementById('availableQuota').value = null;
+                    document.getElementById('subscriptionEndDate').value = null;
+                    document.getElementById('subscriptionEndDate').disabled = false;
+                } else {
+                    errors.innerText = status + ' ' + body.messages;
+                }
+            });
+        } else {
+            console.log("Update cancelled.")
+        }
+    }
+
+</script>
+
+</body>
+</html>
